@@ -1,0 +1,194 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+<h1>Transacoes</h1>
+
+<h2>Adicionar Transacao</h2>
+<form method="POST">
+    {% csrf_token %}
+
+    <label for="type">Tipo:</label>
+    <select name="type" id="type" required>
+        <option value="receita">Receita</option>
+        <option value="despesa">Despesa</option>
+    </select>
+
+    <label for="amount">Valor:</label>
+    <input type="number" step="0.01" min="0.01" name="amount" id="amount" placeholder="0.00" required>
+
+    <label for="category">Categoria:</label>
+    <select name="category" id="category" required {% if not categories %}disabled{% endif %}>
+        {% for category in categories %}
+            <option value="{{ category.id }}">{{ category.name }}</option>
+        {% empty %}
+            <option>Crie uma categoria primeiro</option>
+        {% endfor %}
+    </select>
+
+    <label for="description">Descricao:</label>
+    <input type="text" name="description" id="description" maxlength="255" placeholder="Ex: Salario, Aluguel..." required>
+
+    <label for="date">Data:</label>
+    <input type="date" name="date" id="date" required>
+
+    <button type="submit" {% if not categories %}disabled{% endif %}>Adicionar Transacao</button>
+</form>
+
+<h2>Lista de Transacoes</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Descricao</th>
+            <th>Categoria</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Acoes</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for transaction in transactions %}
+            <tr>
+                <td>{{ transaction.date|date:"d/m/Y" }}</td>
+                <td>{{ transaction.description }}</td>
+                <td>{{ transaction.category.name }}</td>
+                <td style="color: {% if transaction.type == 'receita' %}green{% else %}red{% endif %}; font-weight: bold;">
+                    {{ transaction.type|capfirst }}
+                </td>
+                <td>R$ {{ transaction.amount|floatformat:2 }}</td>
+                <td>
+                    <td class="actions-cell">
+                        <a class="btn-edit" href="{% url 'edit_transaction' transaction.id %}"><B>Editar</B></a>
+                    <button
+                        type="button"
+                        class="btn-delete"
+                        data-delete-url="{% url 'delete_transaction' transaction.id %}"
+                        data-description="{{ transaction.description|escapejs }}"
+                        onclick="openModal(this)">
+                        Deletar
+                    </button>
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="6" style="text-align: center; color: #888;">
+                    Nenhuma transacao encontrada.
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div id="modal-overlay" style="display: none;">
+    <div id="modal-box">
+        <h3>Confirmar exclusao</h3>
+        <p>Tem certeza que deseja deletar a transacao:</p>
+        <p><strong id="modal-description"></strong></p>
+        <p style="color: #888; font-size: 0.9rem;">Essa acao nao pode ser desfeita.</p>
+
+        <form id="delete-form" method="POST" style="display: flex; gap: 10px; margin-top: 1rem; border: 0; padding: 0;">
+            {% csrf_token %}
+            <button type="button" onclick="closeModal()" class="btn-cancel">Cancelar</button>
+            <button type="submit" class="btn-confirm">Sim, deletar</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .btn-delete {
+        background-color: #df0404;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        width: auto;
+        font-size: 0.85rem;
+    }
+    .btn-delete:hover {
+        background-color: #b02a37;
+    }
+
+    #modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #modal-box {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .btn-cancel {
+        flex: 1;
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        width: auto;
+    }
+    .btn-cancel:hover { background-color: #545b62; }
+
+    .btn-confirm {
+        flex: 1;
+        background-color: #dc3545;
+        color: white;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+    .btn-confirm:hover { background-color: #b02a37; }
+
+    .actions-cell {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    }
+
+    .btn-edit {
+        display: inline-block;
+        background-color: #2c5f9e;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        width: auto;
+        font-size: 0.85rem;
+    }
+
+    .btn-edit:hover {
+        background-color: #244d80;
+    }
+</style>
+
+<script>
+    document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+    function openModal(button) {
+        document.getElementById('modal-description').textContent = button.dataset.description;
+        document.getElementById('delete-form').action = button.dataset.deleteUrl;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+    }
+</script>
+
+{% endblock %}

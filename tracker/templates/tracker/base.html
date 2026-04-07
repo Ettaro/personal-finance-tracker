@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Tracker</title>
+    <style>
+        :root {
+            --bg: #f5f7f2;
+            --surface: rgba(255, 255, 255, 0.82);
+            --surface-strong: #ffffff;
+            --text: #1f2a1f;
+            --muted: #6a756b;
+            --border: rgba(38, 59, 40, 0.12);
+            --accent: #1f6f54;
+            --accent-dark: #164f3c;
+            --shadow: 0 18px 60px rgba(31, 42, 31, 0.12);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(31, 111, 84, 0.16), transparent 28%),
+                radial-gradient(circle at top right, rgba(196, 135, 77, 0.18), transparent 26%),
+                linear-gradient(180deg, #f9fbf6 0%, var(--bg) 100%);
+            min-height: 100vh;
+        }
+
+        .shell {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 18px 22px;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .brand-mark {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .brand-mark::before {
+            content: "";
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--accent), #efb366);
+            box-shadow: 0 0 0 6px rgba(31, 111, 84, 0.08);
+        }
+
+        .brand-title {
+            margin: 0;
+            font-size: 1.55rem;
+            font-weight: 700;
+        }
+
+        .brand-subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .nav-links a {
+            padding: 11px 16px;
+            border-radius: 999px;
+            text-decoration: none;
+            color: var(--text);
+            background: rgba(31, 111, 84, 0.08);
+            border: 1px solid transparent;
+            font-weight: 600;
+            transition: 160ms ease;
+        }
+
+        .nav-links a:hover {
+            background: rgba(31, 111, 84, 0.14);
+            border-color: rgba(31, 111, 84, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .page {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 28px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+        }
+
+        h1, h2, h3, h4, p { margin-top: 0; }
+        h1 { font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -0.04em; }
+        h2 { font-size: 1.35rem; margin-bottom: 16px; }
+
+        .section-card {
+            background: var(--surface-strong);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: 0 12px 30px rgba(31, 42, 31, 0.06);
+        }
+
+        .eyebrow {
+            display: inline-block;
+            margin-bottom: 10px;
+            color: var(--accent);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .muted { color: var(--muted); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface-strong);
+            border-radius: 18px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(38, 59, 40, 0.08);
+        }
+
+        th {
+            color: var(--muted);
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            background: rgba(31, 111, 84, 0.05);
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        form {
+            margin-bottom: 2rem;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        label {
+            display: block;
+            margin-top: 12px;
+            margin-bottom: 6px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: #334336;
+        }
+
+        input, select, button {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(38, 59, 40, 0.14);
+            font: inherit;
+        }
+
+        input, select {
+            background: #fff;
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            transition: 180ms ease;
+        }
+
+        button:hover { transform: translateY(-1px); }
+
+        .messages { margin-bottom: 1.5rem; }
+
+        .message {
+            padding: 0.9rem 1rem;
+            border-radius: 16px;
+            margin-bottom: 0.75rem;
+            border: 1px solid transparent;
+        }
+
+        .message.success {
+            background-color: #dff3e8;
+            color: #16533a;
+            border-color: rgba(22, 83, 58, 0.12);
+        }
+
+        .message.error {
+            background-color: #f8ddda;
+            color: #842029;
+            border-color: rgba(132, 32, 41, 0.12);
+        }
+
+        @media (max-width: 900px) {
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .page {
+                padding: 18px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .shell { padding: 14px; }
+            .topbar, .page { border-radius: 20px; }
+            th, td { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-mark">Painel Financeiro</span>
+                <h1 class="brand-title">Financial Tracker</h1>
+                <p class="brand-subtitle">Controle suas entradas, saidas e saldo com mais clareza.</p>
+            </div>
+            <nav class="nav-links">
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <a href="{% url 'list_transactions' %}">Transacoes</a>
+                <a href="{% url 'list_categories' %}">Categorias</a>
+            </nav>
+        </header>
+
+        <main class="page">
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

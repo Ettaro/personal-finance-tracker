@@ -1,0 +1,56 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+<h1>Editar Transacao</h1>
+
+<form method="POST">
+    {% csrf_token %}
+
+    <label for="type">Tipo:</label>
+    <select name="type" id="type" required>
+        <option value="receita" {% if transaction.type == 'receita' %}selected{% endif %}>Receita</option>
+        <option value="despesa" {% if transaction.type == 'despesa' %}selected{% endif %}>Despesa</option>
+    </select>
+
+    <label for="amount">Valor:</label>
+    <input
+        type="number"
+        step="0.01"
+        min="0.01"
+        name="amount"
+        id="amount"
+        value="{{ transaction.amount }}"
+        required
+    >
+
+    <label for="category">Categoria:</label>
+    <select name="category" id="category" required>
+        {% for category in categories %}
+            <option value="{{ category.id }}" {% if category.id == transaction.category.id %}selected{% endif %}>
+                {{ category.name }}
+            </option>
+        {% endfor %}
+    </select>
+
+    <label for="description">Descricao:</label>
+    <input
+        type="text"
+        name="description"
+        id="description"
+        maxlength="255"
+        value="{{ transaction.description }}"
+        required
+    >
+
+    <label for="date">Data:</label>
+    <input
+        type="date"
+        name="date"
+        id="date"
+        value="{{ transaction.date|date:'Y-m-d' }}"
+        required
+    >
+
+    <button type="submit">Salvar alteracoes</button>
+</form>
+{% endblock %}
