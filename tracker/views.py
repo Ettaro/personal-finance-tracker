@@ -5,8 +5,10 @@ from django.core.exceptions import ValidationError
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
-
+from django.http import JsonResponse
 from .models import Category, Transaction
+from .services.financial_analysis import build_period_summary
+
 
 
 def dashboard(request):
@@ -186,3 +188,7 @@ def edit_transaction(request, id):
         'categories': categories,
     }
     return render(request, 'tracker/edit_transaction.html', context)
+
+def financial_analysis_preview(request):
+    data = build_period_summary()
+    return JsonResponse(data)
