@@ -12,6 +12,8 @@ from .services.financial_analysis import build_period_summary
 
 
 def dashboard(request):
+    analysis_data = build_period_summary()
+
     transactions = Transaction.objects.select_related('category').all().order_by('-date', '-id')
     total_receitas = Transaction.objects.filter(type='receita').aggregate(Sum('amount'))['amount__sum'] or 0
     total_despesas = Transaction.objects.filter(type='despesa').aggregate(Sum('amount'))['amount__sum'] or 0
@@ -37,6 +39,8 @@ def dashboard(request):
     )
     monthly_summary_map = {item['type']: item for item in monthly_summary}
 
+    financial_insights = analysis_data['insights']
+
     context = {
         'total_receitas': total_receitas,
         'total_despesas': total_despesas,
@@ -49,6 +53,7 @@ def dashboard(request):
         'category_totals': category_totals,
         'comparison_labels': comparison_labels,
         'comparison_totals': comparison_totals,
+        'financial_insights': financial_insights,
     }
     return render(request, 'tracker/dashboard.html', context)
 

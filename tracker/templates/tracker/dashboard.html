@@ -93,6 +93,23 @@
             </div>
         </div>
     </div>
+<section class="insights-section">
+    <div class="section-card">
+        <span class="eyebrow">Insights</span>
+        <h2>Analise automatica</h2>
+
+        {% if financial_insights %}
+            <div class="insights-list">
+                {% for insight in financial_insights %}
+                    <div class="insight-item">
+                        <p>{{ insight }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">Ainda nao ha dados suficientes para gerar insights.</p>
+        {% endif %}
+    </div>
 </section>
 
 <style>
@@ -313,6 +330,28 @@
             flex-direction: column;
             align-items: flex-start;
         }
+    }
+    .insights-section {
+        margin-top: 18px;
+    }
+
+    .insights-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .insight-item {
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(31, 111, 84, 0.06);
+        border: 1px solid rgba(31, 111, 84, 0.10);
+    }
+
+    .insight-item p {
+        margin: 0;
+        color: var(--text);
+        line-height: 1.6;
     }
 </style>
 
