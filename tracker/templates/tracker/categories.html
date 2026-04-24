@@ -1,35 +1,80 @@
 {% extends 'tracker/base.html' %}
 
 {% block content %}
-    <h1>Categorias</h1>
+    <h1>Categories</h1>
 
-    <h2>Criar Categoria</h2>
+    <h2>Create Category</h2>
     <form method="POST">
         {% csrf_token %}
-        <label for="name">Nome da Categoria:</label>
-        <input type="text" name="name" id="name" maxlength="100" placeholder="Ex: Alimentacao, Lazer..." required>
-        <button type="submit">Criar</button>
+        <label for="name">Category Name:</label>
+        <input type="text" name="name" id="name" maxlength="100" placeholder="Ex: Food, Leisure..." required>
+        <button type="submit">Create</button>
     </form>
 
-    <h2>Lista de Categorias</h2>
+    <h2>Category List</h2>
     <table>
         <thead>
             <tr>
                 <th>ID</th>
-                <th>Nome</th>
+                <th>Name</th>
             </tr>
         </thead>
         <tbody>
             {% for category in categories %}
                 <tr>
-                    <td>{{ category.id }}</td>
-                    <td>{{ category.name }}</td>
+                    <td data-label="ID">{{ category.id }}</td>
+                    <td data-label="Name">{{ category.name }}</td>
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="2" style="text-align: center;">Nenhuma categoria encontrada.</td>
+                    <td colspan="2" style="text-align: center;">No categories found.</td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
+
+<style>
+    @media (max-width: 720px) {
+        table,
+        thead,
+        tbody,
+        th,
+        td,
+        tr {
+            display: block;
+        }
+
+        thead {
+            display: none;
+        }
+
+        tbody {
+            display: grid;
+            gap: 12px;
+        }
+
+        tr {
+            padding: 14px;
+            border: 1px solid rgba(38, 59, 40, 0.08);
+            border-radius: 18px;
+            background: #fff;
+        }
+
+        td {
+            padding: 8px 0;
+            border: 0;
+        }
+
+        td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 4px;
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+    }
+</style>
 {% endblock %}

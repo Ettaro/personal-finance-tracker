@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -92,6 +92,7 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .nav-links a {
@@ -103,6 +104,26 @@
             border: 1px solid transparent;
             font-weight: 600;
             transition: 160ms ease;
+        }
+
+        .nav-links form {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
+        }
+
+        .nav-links button {
+            width: auto;
+            padding: 11px 16px;
+            border-radius: 999px;
+        }
+
+        .nav-user {
+            padding: 0 4px;
+            color: var(--muted);
+            font-size: 0.92rem;
+            font-weight: 600;
         }
 
         .nav-links a:hover {
@@ -235,15 +256,60 @@
                 align-items: flex-start;
             }
 
+            .nav-links {
+                width: 100%;
+            }
+
             .page {
                 padding: 18px;
             }
         }
 
         @media (max-width: 640px) {
-            .shell { padding: 14px; }
+            .shell { padding: 12px; }
             .topbar, .page { border-radius: 20px; }
+            .topbar {
+                padding: 16px;
+            }
+            .brand-title {
+                font-size: 1.3rem;
+            }
+            .brand-subtitle {
+                font-size: 0.9rem;
+            }
+            .nav-links {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+            }
+            .nav-links a,
+            .nav-links button {
+                width: 100%;
+                text-align: center;
+                justify-content: center;
+                padding: 10px 12px;
+            }
+            .nav-links form {
+                width: 100%;
+            }
+            .nav-user {
+                grid-column: 1 / -1;
+                padding: 4px 2px 0;
+            }
+            .page {
+                padding: 16px;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+            h2 {
+                font-size: 1.15rem;
+            }
             th, td { padding: 12px; }
+            form {
+                padding: 1rem;
+                margin-bottom: 1.25rem;
+            }
         }
     </style>
 </head>
@@ -251,14 +317,25 @@
     <div class="shell">
         <header class="topbar">
             <div class="brand">
-                <span class="brand-mark">Painel Financeiro</span>
+                <span class="brand-mark">Financial Overview</span>
                 <h1 class="brand-title">Financial Tracker</h1>
-                <p class="brand-subtitle">Controle suas entradas, saidas e saldo com mais clareza.</p>
+                <p class="brand-subtitle">Track income, expenses, and balance with more clarity.</p>
             </div>
             <nav class="nav-links">
-                <a href="{% url 'dashboard' %}">Dashboard</a>
-                <a href="{% url 'list_transactions' %}">Transacoes</a>
-                <a href="{% url 'list_categories' %}">Categorias</a>
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'dashboard' %}">Dashboard</a>
+                    <a href="{% url 'list_transactions' %}">Transactions</a>
+                    <a href="{% url 'list_categories' %}">Categories</a>
+                    <a href="{% url 'import_receipt' %}">Import Receipt</a>
+                    <span class="nav-user">{{ request.user.username }}</span>
+                    <form method="POST" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit">Logout</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}">Login</a>
+                    <a href="{% url 'signup' %}">Sign Up</a>
+                {% endif %}
             </nav>
         </header>
 

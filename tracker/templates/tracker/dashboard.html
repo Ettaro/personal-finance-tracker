@@ -3,34 +3,34 @@
 {% block content %}
 <section class="hero">
     <div>
-        <span class="eyebrow">Resumo Geral</span>
-        <h1>Seu dinheiro, em uma tela so.</h1>
+        <span class="eyebrow">Overview</span>
+        <h1>Your money, all on one screen.</h1>
         <p class="hero-copy">
-            Veja rapidamente quanto entrou, quanto saiu e quais gastos mais pesam no seu acompanhamento.
+            Quickly see what came in, what went out, and which expenses are weighing most on your budget.
         </p>
     </div>
     <div class="hero-panel">
-        <span class="hero-label">Transacoes registradas</span>
+        <span class="hero-label">Recorded transactions</span>
         <strong>{{ total_transacoes }}</strong>
-        <p class="muted hero-panel-copy">Acompanhe as movimentacoes mais recentes sem sair do dashboard.</p>
+        <p class="muted hero-panel-copy">Keep up with your latest activity without leaving the dashboard.</p>
     </div>
 </section>
 
 <section class="stats-grid">
     <article class="stat-card income">
-        <span>Total de receitas</span>
+        <span>Total income</span>
         <strong>R$ {{ total_receitas|floatformat:2 }}</strong>
-        <small>{{ receitas_count }} lancamento{{ receitas_count|pluralize }}</small>
+        <small>{{ receitas_count }} entry{{ receitas_count|pluralize:"y,ies" }}</small>
     </article>
     <article class="stat-card expense">
-        <span>Total de despesas</span>
+        <span>Total expenses</span>
         <strong>R$ {{ total_despesas|floatformat:2 }}</strong>
-        <small>{{ despesas_count }} lancamento{{ despesas_count|pluralize }}</small>
+        <small>{{ despesas_count }} entry{{ despesas_count|pluralize:"y,ies" }}</small>
     </article>
     <article class="stat-card balance">
-        <span>Saldo atual</span>
+        <span>Current balance</span>
         <strong>R$ {{ saldo|floatformat:2 }}</strong>
-        <small>{% if saldo >= 0 %}Voce esta no azul.{% else %}Atencao ao caixa atual.{% endif %}</small>
+        <small>{% if saldo >= 0 %}You are in the positive.{% else %}Watch your current cash flow.{% endif %}</small>
     </article>
 </section>
 
@@ -38,10 +38,10 @@
     <div class="section-card">
         <div class="section-header">
             <div>
-                <span class="eyebrow">Movimentacoes</span>
-                <h2>Ultimas transacoes</h2>
+                <span class="eyebrow">Activity</span>
+                <h2>Latest transactions</h2>
             </div>
-            <a class="text-link" href="{% url 'list_transactions' %}">Ver todas</a>
+            <a class="text-link" href="{% url 'list_transactions' %}">View all</a>
         </div>
 
         {% if recent_transactions %}
@@ -50,7 +50,7 @@
                     <article class="transaction-item">
                         <div class="transaction-main">
                             <span class="transaction-badge {% if transaction.type == 'receita' %}income-badge{% else %}expense-badge{% endif %}">
-                                {{ transaction.type|capfirst }}
+                                {% if transaction.type == 'receita' %}Income{% else %}Expense{% endif %}
                             </span>
                             <div>
                                 <h3>{{ transaction.description }}</h3>
@@ -64,39 +64,41 @@
                 {% endfor %}
             </div>
         {% else %}
-            <p class="empty-state">Voce ainda nao tem transacoes. Comece cadastrando receitas e despesas para alimentar o dashboard.</p>
+            <p class="empty-state">You do not have any transactions yet. Start adding income and expenses to power your dashboard.</p>
         {% endif %}
     </div>
 
     <div class="dashboard-side">
         <div class="section-card chart-card">
-            <span class="eyebrow">Visualizacao</span>
-            <h2>Despesas por categoria</h2>
+            <span class="eyebrow">Breakdown</span>
+            <h2>Expenses by category</h2>
             {% if category_labels %}
                 <div class="chart-wrapper">
                     <canvas id="categoryChart"></canvas>
                 </div>
             {% else %}
-                <p class="empty-state">Cadastre despesas em categorias diferentes para gerar o grafico.</p>
+                <p class="empty-state">Add expenses across different categories to generate this chart.</p>
             {% endif %}
         </div>
 
         <div class="section-card chart-card secondary-chart-card">
-            <span class="eyebrow">Comparacao</span>
-            <h2>Receitas x despesas</h2>
+            <span class="eyebrow">Comparison</span>
+            <h2>Income vs expenses</h2>
             <div class="chart-wrapper bar-chart-wrapper">
                 <canvas id="comparisonChart"></canvas>
             </div>
             <div class="quick-links">
-                <a href="{% url 'list_transactions' %}">Nova transacao</a>
-                <a href="{% url 'list_categories' %}">Gerenciar categorias</a>
+                <a href="{% url 'list_transactions' %}">New transaction</a>
+                <a href="{% url 'list_categories' %}">Manage categories</a>
             </div>
         </div>
     </div>
+ </section>
+
 <section class="insights-section">
     <div class="section-card">
         <span class="eyebrow">Insights</span>
-        <h2>Analise automatica</h2>
+        <h2>Automated analysis</h2>
 
         {% if financial_insights %}
             <div class="insights-list">
@@ -107,7 +109,7 @@
                 {% endfor %}
             </div>
         {% else %}
-            <p class="empty-state">Ainda nao ha dados suficientes para gerar insights.</p>
+            <p class="empty-state">There is not enough data yet to generate insights.</p>
         {% endif %}
     </div>
 </section>
@@ -321,14 +323,126 @@
         .dashboard-grid {
             grid-template-columns: 1fr;
         }
+
+        .hero-panel {
+            order: -1;
+        }
     }
 
     @media (max-width: 640px) {
+        .hero {
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .hero-panel {
+            padding: 16px;
+            border-radius: 20px;
+        }
+
+        .hero-panel strong {
+            font-size: 1.75rem;
+        }
+
+        .stats-grid {
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat-card {
+            padding: 16px;
+            border-radius: 20px;
+        }
+
+        .stat-card span {
+            margin-bottom: 14px;
+            font-size: 0.78rem;
+        }
+
+        .stat-card strong {
+            margin-bottom: 8px;
+            font-size: 1.7rem;
+        }
+
+        .dashboard-grid,
+        .dashboard-side {
+            gap: 12px;
+        }
+
         .transaction-item,
         .category-text,
         .section-header {
             flex-direction: column;
             align-items: flex-start;
+        }
+
+        .transaction-main {
+            width: 100%;
+            gap: 10px;
+        }
+
+        .transaction-item strong {
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .chart-card,
+        .secondary-chart-card {
+            min-height: 0;
+        }
+
+        .chart-wrapper {
+            min-height: 200px;
+        }
+
+        .bar-chart-wrapper {
+            min-height: 190px;
+        }
+
+        .quick-links {
+            width: 100%;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .quick-links a {
+            flex: 1 1 100%;
+            text-align: center;
+            padding: 12px 14px;
+        }
+
+        .insight-item {
+            padding: 12px 14px;
+        }
+
+        .insight-item p {
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+    }
+
+    @media (max-width: 420px) {
+        .hero h1 {
+            font-size: 1.7rem;
+        }
+
+        .hero-label,
+        .eyebrow {
+            font-size: 0.72rem;
+        }
+
+        .transaction-badge {
+            padding: 7px 10px;
+            font-size: 0.76rem;
+        }
+
+        .transaction-main h3 {
+            font-size: 0.95rem;
+        }
+
+        .transaction-main p,
+        .empty-state {
+            font-size: 0.9rem;
         }
     }
     .insights-section {

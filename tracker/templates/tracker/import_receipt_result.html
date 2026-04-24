@@ -1,0 +1,172 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+<div class="section-card">
+    <span class="eyebrow">Result</span>
+    <h1>Processed receipt</h1>
+
+    <h2>Identified data</h2>
+    {% if parsed_data.ai_metadata %}
+        <div class="receipt-ai-note receipt-ai-note-{{ parsed_data.ai_metadata.provider_status }}">
+            <strong>Interpretation:</strong> {{ parsed_data.ai_metadata.message }}
+        </div>
+    {% endif %}
+    <form method="POST" action="{% url 'save_imported_receipt' %}" class="receipt-result-form">
+        {% csrf_token %}
+
+        <label for="description">Description</label>
+        <input id="description" name="description" type="text" value="{{ parsed_data.description }}" required>
+
+        <label for="amount">Amount</label>
+        <input id="amount" name="amount" type="text" value="{{ parsed_data.amount }}" required>
+
+        <label for="date">Date</label>
+        <input id="date" name="date" type="date" value="{{ parsed_data.date }}" required>
+
+        <label for="type">Type</label>
+        <select id="type" name="type" required>
+            <option value="despesa" {% if parsed_data.type == 'despesa' %}selected{% endif %}>Expense</option>
+            <option value="receita" {% if parsed_data.type == 'receita' %}selected{% endif %}>Income</option>
+        </select>
+
+        <label for="category">Category</label>
+        <select id="category" name="category" required>
+            <option value="">Select a category</option>
+            {% for category in categories %}
+                <option value="{{ category.id }}" {% if parsed_data.category_id == category.id %}selected{% endif %}>
+                    {{ category.name }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <div class="receipt-result-actions">
+            <button type="submit">Save transaction</button>
+            <a href="{% url 'import_receipt' %}">Import another receipt</a>
+        </div>
+    </form>
+
+    <h2>Processed image</h2>
+    <img
+        src="data:image/png;base64,{{ processed_image_base64 }}"
+        alt="Processed receipt"
+        style="max-width: 100%; border-radius: 16px; border: 1px solid rgba(0,0,0,0.08); margin-bottom: 24px;"
+    >
+
+    <h2>Best extracted text</h2>
+    <pre style="white-space: pre-wrap; background: rgba(31, 111, 84, 0.06); padding: 16px; border-radius: 16px;">{{ extracted_text }}</pre>
+
+    {% if ocr_variants %}
+        <div class="ocr-comparison">
+            <div class="ocr-card">
+                <h3>Full image OCR</h3>
+                <pre>{{ ocr_variants.full_image_ocr }}</pre>
+            </div>
+            <div class="ocr-card">
+                <h3>Cropped image OCR</h3>
+                <pre>{{ ocr_variants.cropped_image_ocr }}</pre>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .receipt-result-form {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .receipt-ai-note {
+        margin: 12px 0 18px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: rgba(31, 111, 84, 0.08);
+        border: 1px solid rgba(31, 111, 84, 0.12);
+        color: var(--text);
+    }
+
+    .receipt-ai-note-unconfigured,
+    .receipt-ai-note-fallback,
+    .receipt-ai-note-error,
+    .receipt-ai-note-invalid_response {
+        background: rgba(239, 179, 102, 0.12);
+        border-color: rgba(239, 179, 102, 0.28);
+    }
+
+    .receipt-result-form label {
+        font-weight: 600;
+        color: var(--text);
+    }
+
+    .receipt-result-form input,
+    .receipt-result-form select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: rgba(255, 255, 255, 0.88);
+        font: inherit;
+        color: var(--text);
+    }
+
+    .receipt-result-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 8px;
+    }
+
+    .receipt-result-actions a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .ocr-comparison {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 24px;
+    }
+
+    .ocr-card {
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(31, 111, 84, 0.05);
+        border: 1px solid rgba(31, 111, 84, 0.10);
+    }
+
+    .ocr-card h3 {
+        margin-bottom: 12px;
+    }
+
+    .ocr-card pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    @media (max-width: 800px) {
+        .ocr-comparison {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .receipt-result-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .receipt-result-actions a,
+        .receipt-result-actions button {
+            width: 100%;
+            text-align: center;
+        }
+
+        .ocr-card {
+            padding: 14px;
+        }
+    }
+</style>
+{% endblock %}

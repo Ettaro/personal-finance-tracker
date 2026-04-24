@@ -1,0 +1,60 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+<div class="section-card auth-card">
+    <span class="eyebrow">Welcome back</span>
+    <h1>Login</h1>
+    <p class="muted">Sign in to manage your financial dashboard.</p>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="form-errors">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <label for="{{ form.username.id_for_label }}">Username</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+            <div class="field-error">{{ form.username.errors }}</div>
+        {% endif %}
+
+        <label for="{{ form.password.id_for_label }}">Password</label>
+        {{ form.password }}
+        {% if form.password.errors %}
+            <div class="field-error">{{ form.password.errors }}</div>
+        {% endif %}
+
+        <button type="submit">Login</button>
+    </form>
+
+    <p class="auth-switch">Do not have an account yet? <a href="{% url 'signup' %}">Create one</a>.</p>
+</div>
+
+<style>
+    .auth-card {
+        max-width: 520px;
+        margin: 0 auto;
+    }
+
+    .form-errors,
+    .field-error {
+        margin-top: 8px;
+        color: #842029;
+        font-size: 0.92rem;
+    }
+
+    .auth-switch {
+        margin: 0;
+        color: var(--muted);
+    }
+
+    .auth-switch a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}

@@ -19,48 +19,49 @@ def _build_insights(total_income, total_expense, balance, top_expense_categories
         top_category_total = top_category['total']
 
         insights.append(
-            f"Sua maior categoria de gasto no periodo foi {top_category['category__name']}, com {_format_currency(top_category_total)}."
+            f"Your highest spending category in this period was {top_category['category__name']}, with {_format_currency(top_category_total)}."
         )
 
         if total_expense > 0:
             top_category_ratio = (top_category_total / total_expense) * 100
             if top_category_ratio >= 40:
                 insights.append(
-                    f"Os gastos com {top_category['category__name']} concentram {top_category_ratio:.2f}% das suas despesas."
+                    f"Spending in {top_category['category__name']} accounts for {top_category_ratio:.2f}% of your total expenses."
                 )
 
     if total_income > 0:
         expense_ratio = (total_expense / total_income) * 100
         insights.append(
-            f"No periodo atual, as despesas consumiram {_format_percentage(expense_ratio)} da sua receita."
+            f"In the current period, expenses consumed {_format_percentage(expense_ratio)} of your income."
         )
 
         if expense_ratio >= 80:
             insights.append(
-                "Suas despesas estao consumindo grande parte da sua receita."
+                "Your expenses are consuming a large share of your income."
             )
     else:
         insights.append(
-            "Nao ha receitas registradas no periodo, entao a analise esta baseada apenas nas despesas."
+            "There is no recorded income in this period, so the analysis is based only on expenses."
         )
 
     if balance > 0:
-        insights.append("Seu saldo atual permanece positivo.")
+        insights.append("Your current balance remains positive.")
     elif balance < 0:
-        insights.append("Seu saldo atual esta negativo. Vale revisar os gastos.")
+        insights.append("Your current balance is negative. It may be worth reviewing your spending.")
     else:
-        insights.append("Seu saldo atual esta zerado.")
+        insights.append("Your current balance is zero.")
 
     return insights
 
 
-def build_period_summary():
-    total_income = Transaction.objects.filter(type='receita').aggregate(Sum('amount'))['amount__sum'] or 0
-    total_expense = Transaction.objects.filter(type='despesa').aggregate(Sum('amount'))['amount__sum'] or 0
+def build_period_summary(user):
+    transactions = Transaction.objects.filter(user=user)
+    total_income = transactions.filter(type='receita').aggregate(Sum('amount'))['amount__sum'] or 0
+    total_expense = transactions.filter(type='despesa').aggregate(Sum('amount'))['amount__sum'] or 0
     balance = total_income - total_expense
 
     top_expense_categories = (
-        Transaction.objects.filter(type='despesa')
+        transactions.filter(type='despesa')
         .values('category__name')
         .annotate(total=Sum('amount'))
         .order_by('-total')[:5]

@@ -1,39 +1,57 @@
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from .models import Category, Transaction
 from .services.financial_analysis import build_period_summary
+from .services.recibos.document_parser import (
+    extract_text_from_receipt,
+    extract_receipt_ocr_variants,
+    image_file_to_base64,
+    parse_receipt_ocr_payload,
+    parse_receipt_text,
+    preprocess_receipt_image,
+)
+from .services.recibos.receipt_ai_mapper import map_receipt_fields_with_ai
 
 
-
+@login_required
 def dashboard(request):
-    analysis_data = build_period_summary()
+    analysis_data = build_period_summary(request.user)
 
-    transactions = Transaction.objects.select_related('category').all().order_by('-date', '-id')
-    total_receitas = Transaction.objects.filter(type='receita').aggregate(Sum('amount'))['amount__sum'] or 0
-    total_despesas = Transaction.objects.filter(type='despesa').aggregate(Sum('amount'))['amount__sum'] or 0
+    transactions = (
+        Transaction.objects.select_related('category')
+        .filter(user=request.user)
+        .order_by('-date', '-id')
+    )
+    total_receitas = transactions.filter(type='receita').aggregate(Sum('amount'))['amount__sum'] or 0
+    total_despesas = transactions.filter(type='despesa').aggregate(Sum('amount'))['amount__sum'] or 0
     saldo = total_receitas - total_despesas
     total_transacoes = transactions.count()
     recent_transactions = transactions[:6]
 
     category_summary = (
-        Transaction.objects.filter(type='despesa')
+        transactions.filter(type='despesa')
         .values('category__name')
         .annotate(total=Sum('amount'))
         .order_by('-total')[:5]
     )
     category_labels = [item['category__name'] for item in category_summary]
     category_totals = [float(item['total']) for item in category_summary]
-    comparison_labels = ['Receitas', 'Despesas']
+    comparison_labels = ['Income', 'Expenses']
     comparison_totals = [float(total_receitas), float(total_despesas)]
 
     monthly_summary = (
-        Transaction.objects.values('type')
+        transactions.values('type')
         .annotate(total=Sum('amount'), quantidade=Count('id'))
         .order_by('type')
     )
@@ -58,9 +76,14 @@ def dashboard(request):
     return render(request, 'tracker/dashboard.html', context)
 
 
+@login_required
 def list_transactions(request):
-    transactions = Transaction.objects.select_related('category').all().order_by('-date', '-id')
-    categories = Category.objects.all().order_by('name')
+    transactions = (
+        Transaction.objects.select_related('category')
+        .filter(user=request.user)
+        .order_by('-date', '-id')
+    )
+    categories = Category.objects.filter(user=request.user).order_by('name')
 
     if request.method == 'POST':
         transaction_type = request.POST.get('type', '').strip()
@@ -70,30 +93,31 @@ def list_transactions(request):
         date = request.POST.get('date')
 
         if not categories.exists():
-            messages.error(request, 'Crie uma categoria antes de adicionar transacoes.')
+            messages.error(request, 'Create a category before adding transactions.')
             return redirect('list_transactions')
 
         if transaction_type not in dict(Transaction.TRANSACTION_TYPES):
-            messages.error(request, 'Tipo de transacao invalido.')
+            messages.error(request, 'Invalid transaction type.')
             return redirect('list_transactions')
 
         if not description:
-            messages.error(request, 'A descricao da transacao e obrigatoria.')
+            messages.error(request, 'Transaction description is required.')
             return redirect('list_transactions')
 
         try:
             amount = Decimal(amount_raw)
         except (InvalidOperation, TypeError):
-            messages.error(request, 'Informe um valor valido para a transacao.')
+            messages.error(request, 'Enter a valid amount for the transaction.')
             return redirect('list_transactions')
 
         if amount <= 0:
-            messages.error(request, 'O valor da transacao deve ser maior que zero.')
+            messages.error(request, 'Transaction amount must be greater than zero.')
             return redirect('list_transactions')
 
-        category = get_object_or_404(Category, id=category_id)
+        category = get_object_or_404(Category, id=category_id, user=request.user)
         transaction = Transaction(
             type=transaction_type,
+            user=request.user,
             amount=amount,
             category=category,
             description=description,
@@ -102,48 +126,51 @@ def list_transactions(request):
         try:
             transaction.full_clean()
         except ValidationError:
-            messages.error(request, 'O valor informado excede o limite suportado. Use no maximo 8 digitos antes da virgula e 2 depois.')
+            messages.error(request, 'The amount exceeds the supported limit. Use at most 8 digits before the decimal separator and 2 after it.')
             return redirect('list_transactions')
 
         transaction.save()
-        messages.success(request, 'Transacao adicionada com sucesso.')
+        messages.success(request, 'Transaction added successfully.')
         return redirect('list_transactions')
 
     return render(request, 'tracker/transactions.html', {'transactions': transactions, 'categories': categories})
 
 
+@login_required
 def list_categories(request):
-    categories = Category.objects.all().order_by('name')
+    categories = Category.objects.filter(user=request.user).order_by('name')
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
 
         if not name:
-            messages.error(request, 'O nome da categoria e obrigatorio.')
+            messages.error(request, 'Category name is required.')
             return redirect('list_categories')
 
-        if Category.objects.filter(name__iexact=name).exists():
-            messages.error(request, 'Ja existe uma categoria com esse nome.')
+        if Category.objects.filter(user=request.user, name__iexact=name).exists():
+            messages.error(request, 'A category with this name already exists.')
             return redirect('list_categories')
 
-        Category.objects.create(name=name)
-        messages.success(request, 'Categoria criada com sucesso.')
+        Category.objects.create(user=request.user, name=name)
+        messages.success(request, 'Category created successfully.')
         return redirect('list_categories')
 
     return render(request, 'tracker/categories.html', {'categories': categories})
 
 
 @require_POST
+@login_required
 def delete_transaction(request, id):
-    transaction = get_object_or_404(Transaction, id=id)
+    transaction = get_object_or_404(Transaction, id=id, user=request.user)
     transaction.delete()
-    messages.success(request, 'Transacao removida com sucesso.')
+    messages.success(request, 'Transaction removed successfully.')
     return redirect('list_transactions')
 
 
+@login_required
 def edit_transaction(request, id):
-    transaction = get_object_or_404(Transaction, id=id)
-    categories = Category.objects.all().order_by('name')
+    transaction = get_object_or_404(Transaction, id=id, user=request.user)
+    categories = Category.objects.filter(user=request.user).order_by('name')
 
     if request.method == 'POST':
         transaction_type = request.POST.get('type', '').strip()
@@ -153,24 +180,24 @@ def edit_transaction(request, id):
         date = request.POST.get('date')
 
         if transaction_type not in dict(Transaction.TRANSACTION_TYPES):
-            messages.error(request, 'Tipo de transacao invalido.')
+            messages.error(request, 'Invalid transaction type.')
             return redirect('edit_transaction', id=transaction.id)
 
         if not description:
-            messages.error(request, 'A descricao da transacao e obrigatoria.')
+            messages.error(request, 'Transaction description is required.')
             return redirect('edit_transaction', id=transaction.id)
 
         try:
             amount = Decimal(amount_raw)
         except (InvalidOperation, TypeError):
-            messages.error(request, 'Informe um valor valido para a transacao.')
+            messages.error(request, 'Enter a valid amount for the transaction.')
             return redirect('edit_transaction', id=transaction.id)
 
         if amount <= 0:
-            messages.error(request, 'O valor da transacao deve ser maior que zero.')
+            messages.error(request, 'Transaction amount must be greater than zero.')
             return redirect('edit_transaction', id=transaction.id)
 
-        category = get_object_or_404(Category, id=category_id)
+        category = get_object_or_404(Category, id=category_id, user=request.user)
 
         transaction.type = transaction_type
         transaction.amount = amount
@@ -181,11 +208,11 @@ def edit_transaction(request, id):
         try:
             transaction.full_clean()
         except ValidationError:
-            messages.error(request, 'O valor informado excede o limite suportado.')
+            messages.error(request, 'The amount exceeds the supported limit.')
             return redirect('edit_transaction', id=transaction.id)
 
         transaction.save()
-        messages.success(request, 'Transacao atualizada com sucesso.')
+        messages.success(request, 'Transaction updated successfully.')
         return redirect('list_transactions')
 
     context = {
@@ -195,5 +222,186 @@ def edit_transaction(request, id):
     return render(request, 'tracker/edit_transaction.html', context)
 
 def financial_analysis_preview(request):
-    data = build_period_summary()
+    data = build_period_summary(request.user)
     return JsonResponse(data)
+
+
+def _normalize_imported_amount(amount_raw):
+    normalized_amount = (amount_raw or '').strip().replace('R$', '').replace(' ', '')
+    normalized_amount = normalized_amount.replace('.', '').replace(',', '.')
+    return Decimal(normalized_amount)
+
+
+def _normalize_imported_date(date_raw):
+    normalized_date = (date_raw or '').strip()
+    if not normalized_date:
+        return ''
+
+    try:
+        return datetime.strptime(normalized_date, '%d/%m/%Y').date().isoformat()
+    except ValueError:
+        return normalized_date
+
+
+def _suggest_category(categories, description):
+    description_lower = (description or '').lower()
+
+    keyword_map = {
+        'alimentacao': ('mercado', 'supermercado', 'restaurante', 'lanchonete', 'delivery', 'ifood'),
+        'lazer': ('cinema', 'show', 'bar', 'streaming'),
+        'transporte': ('uber', '99', 'posto', 'combustivel', 'gasolina'),
+        'assinaturas': ('netflix', 'spotify', 'amazon', 'prime', 'youtube'),
+    }
+
+    for category in categories:
+        category_name = category.name.lower()
+        keywords = keyword_map.get(category_name, ())
+        if category_name in description_lower or any(keyword in description_lower for keyword in keywords):
+            return category.id
+
+    return ''
+
+
+def _find_category_by_name(categories, suggested_category_name):
+    if not suggested_category_name:
+        return ''
+
+    for category in categories:
+        if category.name.lower() == suggested_category_name.lower():
+            return category.id
+
+    return ''
+
+
+@login_required
+def import_receipt(request):
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('receipt_image')
+
+        if not uploaded_file:
+            messages.error(request, 'Select an image to analyze.')
+            return redirect('import_receipt')
+
+        categories = Category.objects.filter(user=request.user).order_by('name')
+        processed_image = preprocess_receipt_image(uploaded_file)
+        ocr_variants = extract_receipt_ocr_variants(processed_image)
+        extracted_text = ocr_variants['best_text']
+        parsed_data = parse_receipt_ocr_payload(ocr_variants)
+        parsed_data = map_receipt_fields_with_ai(ocr_variants, parsed_data, categories)
+        processed_image_base64 = image_file_to_base64(processed_image)
+
+        parsed_data['amount'] = parsed_data.get('amount', '')
+        parsed_data['date'] = _normalize_imported_date(parsed_data.get('date', ''))
+        parsed_data['type'] = parsed_data.get('type', 'despesa')
+        parsed_data['category_id'] = _find_category_by_name(
+            categories,
+            parsed_data.get('suggested_category', ''),
+        ) or _suggest_category(categories, parsed_data.get('description', ''))
+
+        context = {
+            'categories': categories,
+            'ocr_variants': ocr_variants,
+            'processed_image_base64': processed_image_base64,
+            'extracted_text': extracted_text,
+            'parsed_data': parsed_data,
+        }
+        return render(request, 'tracker/import_receipt_result.html', context)
+
+    return render(request, 'tracker/import_receipt.html')
+
+
+@require_POST
+@login_required
+def save_imported_receipt(request):
+    categories = Category.objects.filter(user=request.user).order_by('name')
+    description = request.POST.get('description', '').strip()
+    amount_raw = request.POST.get('amount', '').strip()
+    transaction_type = request.POST.get('type', '').strip()
+    category_id = request.POST.get('category')
+    date = request.POST.get('date', '').strip()
+
+    if not categories.exists():
+        messages.error(request, 'Create a category before importing a transaction from a receipt.')
+        return redirect('list_categories')
+
+    if transaction_type not in dict(Transaction.TRANSACTION_TYPES):
+        messages.error(request, 'Invalid transaction type.')
+        return redirect('import_receipt')
+
+    if not description:
+        messages.error(request, 'Transaction description is required.')
+        return redirect('import_receipt')
+
+    try:
+        amount = _normalize_imported_amount(amount_raw)
+    except (InvalidOperation, TypeError):
+        messages.error(request, 'Could not interpret the receipt amount. Review the field before saving.')
+        return redirect('import_receipt')
+
+    if amount <= 0:
+        messages.error(request, 'Transaction amount must be greater than zero.')
+        return redirect('import_receipt')
+
+    category = get_object_or_404(Category, id=category_id, user=request.user)
+    transaction = Transaction(
+        type=transaction_type,
+        user=request.user,
+        amount=amount,
+        category=category,
+        description=description,
+        date=date or None,
+    )
+
+    try:
+        transaction.full_clean()
+    except ValidationError:
+        messages.error(request, 'Imported data could not be saved. Review the amount, date, and category.')
+        return redirect('import_receipt')
+
+    transaction.save()
+    messages.success(request, 'Transaction imported successfully from the receipt.')
+    return redirect('list_transactions')
+
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    form = AuthenticationForm(request, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        login(request, form.get_user())
+        messages.success(request, 'You are now signed in.')
+        return redirect('dashboard')
+
+    return render(request, 'tracker/login.html', {'form': form})
+
+
+def signup_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    form = UserCreationForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        username = form.cleaned_data.get('username', '').strip()
+        if username and form._meta.model.objects.filter(username__iexact=username).exists():
+            form.add_error('username', 'An account with this username already exists.')
+            return render(request, 'tracker/signup.html', {'form': form})
+
+        try:
+            user = form.save()
+        except IntegrityError:
+            form.add_error('username', 'An account with this username already exists.')
+            return render(request, 'tracker/signup.html', {'form': form})
+
+        login(request, user)
+        messages.success(request, 'Your account has been created successfully.')
+        return redirect('dashboard')
+
+    return render(request, 'tracker/signup.html', {'form': form})
+
+
+@require_POST
+def logout_view(request):
+    logout(request)
+    messages.success(request, 'You have been signed out.')
+    return redirect('login')

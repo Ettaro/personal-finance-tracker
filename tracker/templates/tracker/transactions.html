@@ -1,78 +1,77 @@
 {% extends 'tracker/base.html' %}
 
 {% block content %}
-<h1>Transacoes</h1>
+<h1>Transactions</h1>
 
-<h2>Adicionar Transacao</h2>
+<h2>Add Transaction</h2>
 <form method="POST">
     {% csrf_token %}
 
-    <label for="type">Tipo:</label>
+    <label for="type">Type:</label>
     <select name="type" id="type" required>
-        <option value="receita">Receita</option>
-        <option value="despesa">Despesa</option>
+        <option value="receita">Income</option>
+        <option value="despesa">Expense</option>
     </select>
 
-    <label for="amount">Valor:</label>
+    <label for="amount">Amount:</label>
     <input type="number" step="0.01" min="0.01" name="amount" id="amount" placeholder="0.00" required>
 
-    <label for="category">Categoria:</label>
+    <label for="category">Category:</label>
     <select name="category" id="category" required {% if not categories %}disabled{% endif %}>
         {% for category in categories %}
             <option value="{{ category.id }}">{{ category.name }}</option>
         {% empty %}
-            <option>Crie uma categoria primeiro</option>
+            <option>Create a category first</option>
         {% endfor %}
     </select>
 
-    <label for="description">Descricao:</label>
-    <input type="text" name="description" id="description" maxlength="255" placeholder="Ex: Salario, Aluguel..." required>
+    <label for="description">Description:</label>
+    <input type="text" name="description" id="description" maxlength="255" placeholder="Ex: Salary, Rent..." required>
 
-    <label for="date">Data:</label>
+    <label for="date">Date:</label>
     <input type="date" name="date" id="date" required>
 
-    <button type="submit" {% if not categories %}disabled{% endif %}>Adicionar Transacao</button>
+    <button type="submit" {% if not categories %}disabled{% endif %}>Add Transaction</button>
 </form>
 
-<h2>Lista de Transacoes</h2>
+<h2>Transactions List</h2>
 <table>
     <thead>
         <tr>
-            <th>Data</th>
-            <th>Descricao</th>
-            <th>Categoria</th>
-            <th>Tipo</th>
-            <th>Valor</th>
-            <th>Acoes</th>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Actions</th>
         </tr>
     </thead>
     <tbody>
         {% for transaction in transactions %}
             <tr>
-                <td>{{ transaction.date|date:"d/m/Y" }}</td>
-                <td>{{ transaction.description }}</td>
-                <td>{{ transaction.category.name }}</td>
-                <td style="color: {% if transaction.type == 'receita' %}green{% else %}red{% endif %}; font-weight: bold;">
-                    {{ transaction.type|capfirst }}
+                <td data-label="Date">{{ transaction.date|date:"d/m/Y" }}</td>
+                <td data-label="Description">{{ transaction.description }}</td>
+                <td data-label="Category">{{ transaction.category.name }}</td>
+                <td data-label="Type" style="color: {% if transaction.type == 'receita' %}green{% else %}red{% endif %}; font-weight: bold;">
+                    {% if transaction.type == 'receita' %}Income{% else %}Expense{% endif %}
                 </td>
-                <td>R$ {{ transaction.amount|floatformat:2 }}</td>
-                <td>
-                    <td class="actions-cell">
-                        <a class="btn-edit" href="{% url 'edit_transaction' transaction.id %}"><B>Editar</B></a>
+                <td data-label="Amount">R$ {{ transaction.amount|floatformat:2 }}</td>
+                <td data-label="Actions" class="actions-cell">
+                        <a class="btn-edit" href="{% url 'edit_transaction' transaction.id %}"><b>Edit</b></a>
                     <button
                         type="button"
                         class="btn-delete"
                         data-delete-url="{% url 'delete_transaction' transaction.id %}"
                         data-description="{{ transaction.description|escapejs }}"
                         onclick="openModal(this)">
-                        Deletar
+                        Delete
                     </button>
                 </td>
             </tr>
         {% empty %}
             <tr>
                 <td colspan="6" style="text-align: center; color: #888;">
-                    Nenhuma transacao encontrada.
+                    No transactions found.
                 </td>
             </tr>
         {% endfor %}
@@ -81,15 +80,15 @@
 
 <div id="modal-overlay" style="display: none;">
     <div id="modal-box">
-        <h3>Confirmar exclusao</h3>
-        <p>Tem certeza que deseja deletar a transacao:</p>
+        <h3>Confirm deletion</h3>
+        <p>Are you sure you want to delete this transaction?</p>
         <p><strong id="modal-description"></strong></p>
-        <p style="color: #888; font-size: 0.9rem;">Essa acao nao pode ser desfeita.</p>
+        <p style="color: #888; font-size: 0.9rem;">This action cannot be undone.</p>
 
         <form id="delete-form" method="POST" style="display: flex; gap: 10px; margin-top: 1rem; border: 0; padding: 0;">
             {% csrf_token %}
-            <button type="button" onclick="closeModal()" class="btn-cancel">Cancelar</button>
-            <button type="submit" class="btn-confirm">Sim, deletar</button>
+            <button type="button" onclick="closeModal()" class="btn-cancel">Cancel</button>
+            <button type="submit" class="btn-confirm">Yes, delete</button>
         </form>
     </div>
 </div>
@@ -155,9 +154,10 @@
     .btn-confirm:hover { background-color: #b02a37; }
 
     .actions-cell {
-    display: flex;
-    gap: 8px;
-    align-items: center;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
     }
 
     .btn-edit {
@@ -174,6 +174,63 @@
 
     .btn-edit:hover {
         background-color: #244d80;
+    }
+
+    @media (max-width: 720px) {
+        table,
+        thead,
+        tbody,
+        th,
+        td,
+        tr {
+            display: block;
+        }
+
+        thead {
+            display: none;
+        }
+
+        tbody {
+            display: grid;
+            gap: 12px;
+        }
+
+        tr {
+            padding: 14px;
+            border: 1px solid rgba(38, 59, 40, 0.08);
+            border-radius: 18px;
+            background: #fff;
+        }
+
+        td {
+            padding: 8px 0;
+            border: 0;
+        }
+
+        td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 4px;
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .actions-cell {
+            gap: 10px;
+        }
+
+        .btn-edit,
+        .btn-delete {
+            flex: 1 1 140px;
+            text-align: center;
+        }
+
+        #modal-box {
+            padding: 1.25rem;
+        }
     }
 </style>
 

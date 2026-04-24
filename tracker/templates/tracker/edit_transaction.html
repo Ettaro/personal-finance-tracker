@@ -1,18 +1,18 @@
 {% extends 'tracker/base.html' %}
 
 {% block content %}
-<h1>Editar Transacao</h1>
+<h1>Edit Transaction</h1>
 
 <form method="POST">
     {% csrf_token %}
 
-    <label for="type">Tipo:</label>
+    <label for="type">Type:</label>
     <select name="type" id="type" required>
-        <option value="receita" {% if transaction.type == 'receita' %}selected{% endif %}>Receita</option>
-        <option value="despesa" {% if transaction.type == 'despesa' %}selected{% endif %}>Despesa</option>
+        <option value="receita" {% if transaction.type == 'receita' %}selected{% endif %}>Income</option>
+        <option value="despesa" {% if transaction.type == 'despesa' %}selected{% endif %}>Expense</option>
     </select>
 
-    <label for="amount">Valor:</label>
+    <label for="amount">Amount:</label>
     <input
         type="number"
         step="0.01"
@@ -23,7 +23,7 @@
         required
     >
 
-    <label for="category">Categoria:</label>
+    <label for="category">Category:</label>
     <select name="category" id="category" required>
         {% for category in categories %}
             <option value="{{ category.id }}" {% if category.id == transaction.category.id %}selected{% endif %}>
@@ -32,7 +32,7 @@
         {% endfor %}
     </select>
 
-    <label for="description">Descricao:</label>
+    <label for="description">Description:</label>
     <input
         type="text"
         name="description"
@@ -42,7 +42,7 @@
         required
     >
 
-    <label for="date">Data:</label>
+    <label for="date">Date:</label>
     <input
         type="date"
         name="date"
@@ -51,6 +51,6 @@
         required
     >
 
-    <button type="submit">Salvar alteracoes</button>
+    <button type="submit">Save Changes</button>
 </form>
 {% endblock %}
