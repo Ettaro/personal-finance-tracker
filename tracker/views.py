@@ -1,3 +1,5 @@
+import base64
+import binascii
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -6,6 +8,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
@@ -13,6 +16,12 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from .models import Category, Transaction
 from .services.financial_analysis import build_period_summary
+from .services.category_classifier import (
+    create_default_categories_for_user,
+    find_category_by_name,
+    suggest_category,
+)
+from .services.recibos.asprise_client import extract_receipt_with_asprise
 from .services.recibos.document_parser import (
     extract_text_from_receipt,
     extract_receipt_ocr_variants,
@@ -160,6 +169,46 @@ def list_categories(request):
 
 @require_POST
 @login_required
+def edit_category(request, id):
+    category = get_object_or_404(Category, id=id, user=request.user)
+    name = request.POST.get('name', '').strip()
+
+    if not name:
+        messages.error(request, 'Category name is required.')
+        return redirect('list_categories')
+
+    duplicate_exists = (
+        Category.objects
+        .filter(user=request.user, name__iexact=name)
+        .exclude(id=category.id)
+        .exists()
+    )
+    if duplicate_exists:
+        messages.error(request, 'A category with this name already exists.')
+        return redirect('list_categories')
+
+    category.name = name
+    category.save()
+    messages.success(request, 'Category updated successfully.')
+    return redirect('list_categories')
+
+
+@require_POST
+@login_required
+def delete_category(request, id):
+    category = get_object_or_404(Category, id=id, user=request.user)
+
+    if Transaction.objects.filter(user=request.user, category=category).exists():
+        messages.error(request, 'This category has transactions and cannot be deleted.')
+        return redirect('list_categories')
+
+    category.delete()
+    messages.success(request, 'Category removed successfully.')
+    return redirect('list_categories')
+
+
+@require_POST
+@login_required
 def delete_transaction(request, id):
     transaction = get_object_or_404(Transaction, id=id, user=request.user)
     transaction.delete()
@@ -244,70 +293,97 @@ def _normalize_imported_date(date_raw):
 
 
 def _suggest_category(categories, description):
-    description_lower = (description or '').lower()
-
-    keyword_map = {
-        'alimentacao': ('mercado', 'supermercado', 'restaurante', 'lanchonete', 'delivery', 'ifood'),
-        'lazer': ('cinema', 'show', 'bar', 'streaming'),
-        'transporte': ('uber', '99', 'posto', 'combustivel', 'gasolina'),
-        'assinaturas': ('netflix', 'spotify', 'amazon', 'prime', 'youtube'),
-    }
-
-    for category in categories:
-        category_name = category.name.lower()
-        keywords = keyword_map.get(category_name, ())
-        if category_name in description_lower or any(keyword in description_lower for keyword in keywords):
-            return category.id
-
-    return ''
+    category = suggest_category(categories, description)
+    return category.id if category else ''
 
 
 def _find_category_by_name(categories, suggested_category_name):
-    if not suggested_category_name:
-        return ''
-
-    for category in categories:
-        if category.name.lower() == suggested_category_name.lower():
-            return category.id
-
-    return ''
+    category = find_category_by_name(categories, suggested_category_name)
+    return category.id if category else ''
 
 
-@login_required
-def import_receipt(request):
-    if request.method == 'POST':
-        uploaded_file = request.FILES.get('receipt_image')
+def _build_receipt_import_context(user, uploaded_file):
+    categories = Category.objects.filter(user=user).order_by('name')
+    processed_image = preprocess_receipt_image(uploaded_file)
+    processed_image_base64 = image_file_to_base64(processed_image)
 
-        if not uploaded_file:
-            messages.error(request, 'Select an image to analyze.')
-            return redirect('import_receipt')
+    parsed_data = None
+    extracted_text = ''
+    ocr_variants = None
 
-        categories = Category.objects.filter(user=request.user).order_by('name')
-        processed_image = preprocess_receipt_image(uploaded_file)
+    try:
+        asprise_result = extract_receipt_with_asprise(processed_image)
+    except Exception:
+        asprise_result = None
+
+    if asprise_result:
+        parsed_data = asprise_result['parsed_data']
+        extracted_text = parsed_data.get('ocr_text', '')
+        ocr_variants = {
+            'best_text': extracted_text,
+            'best_source': 'asprise',
+            'full_image_ocr': extracted_text,
+            'cropped_image_ocr': '',
+        }
+    else:
         ocr_variants = extract_receipt_ocr_variants(processed_image)
         extracted_text = ocr_variants['best_text']
         parsed_data = parse_receipt_ocr_payload(ocr_variants)
         parsed_data = map_receipt_fields_with_ai(ocr_variants, parsed_data, categories)
-        processed_image_base64 = image_file_to_base64(processed_image)
 
-        parsed_data['amount'] = parsed_data.get('amount', '')
-        parsed_data['date'] = _normalize_imported_date(parsed_data.get('date', ''))
-        parsed_data['type'] = parsed_data.get('type', 'despesa')
-        parsed_data['category_id'] = _find_category_by_name(
-            categories,
-            parsed_data.get('suggested_category', ''),
-        ) or _suggest_category(categories, parsed_data.get('description', ''))
+    parsed_data['amount'] = parsed_data.get('amount', '')
+    parsed_data['date'] = _normalize_imported_date(parsed_data.get('date', ''))
+    parsed_data['type'] = parsed_data.get('type', 'despesa')
+    parsed_data['category_id'] = _find_category_by_name(
+        categories,
+        parsed_data.get('suggested_category', ''),
+    ) or _suggest_category(
+        categories,
+        ' '.join(
+            str(value or '')
+            for value in (
+                parsed_data.get('description'),
+                parsed_data.get('ocr_text'),
+                extracted_text,
+            )
+        ),
+    )
 
-        context = {
-            'categories': categories,
-            'ocr_variants': ocr_variants,
-            'processed_image_base64': processed_image_base64,
-            'extracted_text': extracted_text,
-            'parsed_data': parsed_data,
-        }
+    return {
+        'categories': categories,
+        'ocr_variants': ocr_variants,
+        'processed_image_base64': processed_image_base64,
+        'extracted_text': extracted_text,
+        'parsed_data': parsed_data,
+    }
+
+
+@login_required
+def import_receipt(request):
+    return redirect('receipt_scan')
+
+
+@login_required
+def receipt_scan(request):
+    if request.method == 'POST':
+        captured_image_data = request.POST.get('captured_image_data', '').strip()
+
+        if not captured_image_data:
+            messages.error(request, 'Capture a photo before continuing.')
+            return redirect('receipt_scan')
+
+        try:
+            _, encoded_image = captured_image_data.split(',', 1)
+            image_bytes = base64.b64decode(encoded_image)
+        except (ValueError, binascii.Error):
+            messages.error(request, 'The captured image could not be processed. Try taking the photo again.')
+            return redirect('receipt_scan')
+
+        uploaded_file = ContentFile(image_bytes, name='receipt_scan.png')
+        context = _build_receipt_import_context(request.user, uploaded_file)
         return render(request, 'tracker/import_receipt_result.html', context)
 
-    return render(request, 'tracker/import_receipt.html')
+    return render(request, 'tracker/receipt_scan.html')
 
 
 @require_POST
@@ -393,6 +469,7 @@ def signup_view(request):
             form.add_error('username', 'An account with this username already exists.')
             return render(request, 'tracker/signup.html', {'form': form})
 
+        create_default_categories_for_user(user)
         login(request, user)
         messages.success(request, 'Your account has been created successfully.')
         return redirect('dashboard')

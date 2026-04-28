@@ -20,12 +20,12 @@
     <article class="stat-card income">
         <span>Total income</span>
         <strong>R$ {{ total_receitas|floatformat:2 }}</strong>
-        <small>{{ receitas_count }} entry{{ receitas_count|pluralize:"y,ies" }}</small>
+        <small>{{ receitas_count }} entr{{ receitas_count|pluralize:"y,ies" }}</small>
     </article>
     <article class="stat-card expense">
         <span>Total expenses</span>
         <strong>R$ {{ total_despesas|floatformat:2 }}</strong>
-        <small>{{ despesas_count }} entry{{ despesas_count|pluralize:"y,ies" }}</small>
+        <small>{{ despesas_count }} entr{{ despesas_count|pluralize:"y,ies" }}</small>
     </article>
     <article class="stat-card balance">
         <span>Current balance</span>

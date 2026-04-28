@@ -52,21 +52,25 @@
         style="max-width: 100%; border-radius: 16px; border: 1px solid rgba(0,0,0,0.08); margin-bottom: 24px;"
     >
 
-    <h2>Best extracted text</h2>
-    <pre style="white-space: pre-wrap; background: rgba(31, 111, 84, 0.06); padding: 16px; border-radius: 16px;">{{ extracted_text }}</pre>
+    <details class="ocr-details">
+        <summary>Show OCR details</summary>
 
-    {% if ocr_variants %}
-        <div class="ocr-comparison">
-            <div class="ocr-card">
-                <h3>Full image OCR</h3>
-                <pre>{{ ocr_variants.full_image_ocr }}</pre>
+        <h2>Best extracted text</h2>
+        <pre class="ocr-text-block">{{ extracted_text }}</pre>
+
+        {% if ocr_variants %}
+            <div class="ocr-comparison">
+                <div class="ocr-card">
+                    <h3>Full image OCR</h3>
+                    <pre>{{ ocr_variants.full_image_ocr }}</pre>
+                </div>
+                <div class="ocr-card">
+                    <h3>Cropped image OCR</h3>
+                    <pre>{{ ocr_variants.cropped_image_ocr|default:"Not used for this provider." }}</pre>
+                </div>
             </div>
-            <div class="ocr-card">
-                <h3>Cropped image OCR</h3>
-                <pre>{{ ocr_variants.cropped_image_ocr }}</pre>
-            </div>
-        </div>
-    {% endif %}
+        {% endif %}
+    </details>
 </div>
 
 <style>
@@ -144,6 +148,34 @@
         margin: 0;
         white-space: pre-wrap;
         word-break: break-word;
+    }
+
+    .ocr-details {
+        margin-top: 20px;
+    }
+
+    .ocr-details summary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 16px;
+        border-radius: 999px;
+        background: rgba(31, 111, 84, 0.08);
+        color: var(--accent);
+        font-weight: 700;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .ocr-details[open] summary {
+        margin-bottom: 18px;
+    }
+
+    .ocr-text-block {
+        white-space: pre-wrap;
+        background: rgba(31, 111, 84, 0.06);
+        padding: 16px;
+        border-radius: 16px;
     }
 
     @media (max-width: 800px) {

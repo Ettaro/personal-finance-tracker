@@ -1,0 +1,347 @@
+{% extends 'tracker/base.html' %}
+
+{% block content %}
+<section class="scan-shell">
+    <div class="scan-intro section-card">
+        <span class="eyebrow">Scanner</span>
+        <h1>Capture your receipt</h1>
+        <p class="muted">Center the receipt inside the frame, keep the camera steady, and use good lighting before taking the photo.</p>
+        <div class="scan-tips">
+            <span>Keep the receipt flat</span>
+            <span>Avoid shadows</span>
+            <span>Fill most of the frame</span>
+        </div>
+    </div>
+
+    <div class="scan-layout">
+        <div class="camera-card section-card">
+            <div class="camera-stage" id="camera-stage">
+                <video id="camera-stream" autoplay playsinline muted></video>
+                <canvas id="capture-canvas" hidden></canvas>
+                <img id="captured-preview" alt="Captured receipt preview" hidden>
+
+                <div class="frame-overlay" aria-hidden="true">
+                    <div class="frame-guide"></div>
+                    <p class="frame-label">Align the receipt inside the frame</p>
+                </div>
+            </div>
+
+            <div class="camera-actions">
+                <button type="button" id="start-camera-button">Start camera</button>
+                <button type="button" id="capture-button" disabled>Capture photo</button>
+                <button type="button" id="retake-button" hidden>Retake</button>
+            </div>
+        </div>
+
+        <div class="review-card section-card">
+            <span class="eyebrow">Review</span>
+            <h2>Use this photo?</h2>
+            <p class="muted" id="scan-status">Start the camera and capture a photo when the receipt is fully visible.</p>
+            <img id="review-preview" alt="Receipt crop preview" hidden>
+
+            <form method="POST" id="captured-image-form">
+                {% csrf_token %}
+                <input type="hidden" name="captured_image_data" id="captured-image-data">
+                <button type="submit" id="use-photo-button" disabled>Use photo</button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<style>
+    .scan-shell {
+        display: grid;
+        gap: 20px;
+    }
+
+    .scan-intro p {
+        max-width: 56ch;
+    }
+
+    .scan-tips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .scan-tips span {
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(31, 111, 84, 0.08);
+        color: var(--accent);
+        font-size: 0.92rem;
+        font-weight: 600;
+    }
+
+    .scan-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.85fr);
+        gap: 20px;
+        align-items: start;
+    }
+
+    .camera-card,
+    .review-card {
+        display: grid;
+        gap: 18px;
+    }
+
+    .camera-stage {
+        position: relative;
+        overflow: hidden;
+        border-radius: 28px;
+        aspect-ratio: 4 / 5;
+        min-height: 420px;
+        background:
+            radial-gradient(circle at top, rgba(31, 111, 84, 0.16), transparent 48%),
+            linear-gradient(180deg, #0f1d17 0%, #16251e 100%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #camera-stream,
+    #captured-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .frame-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+            linear-gradient(to bottom, rgba(7, 13, 10, 0.38), rgba(7, 13, 10, 0.10) 20%, rgba(7, 13, 10, 0.10) 80%, rgba(7, 13, 10, 0.42));
+    }
+
+    .frame-guide {
+        width: min(88%, 480px);
+        aspect-ratio: 0.74;
+        border-radius: 28px;
+        border: 3px solid rgba(255, 255, 255, 0.92);
+        box-shadow:
+            0 0 0 999px rgba(7, 13, 10, 0.34),
+            0 0 0 8px rgba(255, 255, 255, 0.08);
+    }
+
+    .frame-label {
+        position: absolute;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        margin: 0;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        font-size: 0.92rem;
+        font-weight: 600;
+        backdrop-filter: blur(10px);
+    }
+
+    .camera-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .camera-actions button,
+    #captured-image-form button {
+        width: auto;
+        min-width: 160px;
+    }
+
+    #review-preview {
+        width: 100%;
+        border-radius: 22px;
+        border: 1px solid rgba(31, 111, 84, 0.12);
+        background: rgba(31, 111, 84, 0.04);
+    }
+
+    @media (max-width: 900px) {
+        .scan-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .camera-stage {
+            min-height: 380px;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .camera-stage {
+            min-height: 320px;
+            border-radius: 22px;
+        }
+
+        .frame-guide {
+            width: 92%;
+            border-radius: 22px;
+        }
+
+        .camera-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        .camera-actions button,
+        #captured-image-form button {
+            width: 100%;
+        }
+
+        .frame-label {
+            width: calc(100% - 32px);
+            text-align: center;
+            border-radius: 18px;
+        }
+    }
+</style>
+
+<script>
+    (() => {
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('capture-canvas');
+        const preview = document.getElementById('captured-preview');
+        const startButton = document.getElementById('start-camera-button');
+        const captureButton = document.getElementById('capture-button');
+        const retakeButton = document.getElementById('retake-button');
+        const usePhotoButton = document.getElementById('use-photo-button');
+        const hiddenInput = document.getElementById('captured-image-data');
+        const statusText = document.getElementById('scan-status');
+        const frameOverlay = document.querySelector('.frame-overlay');
+        const frameGuide = document.querySelector('.frame-guide');
+        const reviewPreview = document.getElementById('review-preview');
+
+        let stream;
+
+        async function stopStream() {
+            if (!stream) {
+                return;
+            }
+
+            stream.getTracks().forEach((track) => track.stop());
+            stream = null;
+        }
+
+        async function startCamera() {
+            statusText.textContent = 'Requesting camera access...';
+
+            try {
+                await stopStream();
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                    },
+                    audio: false,
+                });
+
+                video.srcObject = stream;
+                preview.hidden = true;
+                reviewPreview.hidden = true;
+                video.hidden = false;
+                frameOverlay.hidden = false;
+                captureButton.disabled = false;
+                retakeButton.hidden = true;
+                usePhotoButton.disabled = true;
+                hiddenInput.value = '';
+                statusText.textContent = 'Position the receipt inside the frame and capture the photo.';
+            } catch (error) {
+                statusText.textContent = 'Camera access failed. You can upload a receipt image from your files instead.';
+            }
+        }
+
+        function capturePhoto() {
+            if (!stream) {
+                return;
+            }
+
+            const sourceWidth = video.videoWidth;
+            const sourceHeight = video.videoHeight;
+
+            if (!sourceWidth || !sourceHeight) {
+                statusText.textContent = 'The camera is not ready yet. Try again in a moment.';
+                return;
+            }
+
+            const videoRect = video.getBoundingClientRect();
+            const frameRect = frameGuide.getBoundingClientRect();
+            const containerWidth = videoRect.width;
+            const containerHeight = videoRect.height;
+            const videoScale = Math.max(
+                containerWidth / sourceWidth,
+                containerHeight / sourceHeight
+            );
+
+            const renderedWidth = sourceWidth * videoScale;
+            const renderedHeight = sourceHeight * videoScale;
+            const offsetX = (renderedWidth - containerWidth) / 2;
+            const offsetY = (renderedHeight - containerHeight) / 2;
+
+            const cropX = frameRect.left - videoRect.left;
+            const cropY = frameRect.top - videoRect.top;
+            const cropWidth = frameRect.width;
+            const cropHeight = frameRect.height;
+
+            const sx = Math.max(0, (cropX + offsetX) * (sourceWidth / renderedWidth));
+            const sy = Math.max(0, (cropY + offsetY) * (sourceHeight / renderedHeight));
+            const sw = Math.min(sourceWidth - sx, cropWidth * (sourceWidth / renderedWidth));
+            const sh = Math.min(sourceHeight - sy, cropHeight * (sourceHeight / renderedHeight));
+
+            canvas.width = Math.max(1, Math.round(sw));
+            canvas.height = Math.max(1, Math.round(sh));
+
+            const context = canvas.getContext('2d');
+            context.drawImage(
+                video,
+                sx,
+                sy,
+                sw,
+                sh,
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+            const imageData = canvas.toDataURL('image/png');
+            hiddenInput.value = imageData;
+            preview.src = imageData;
+            reviewPreview.src = imageData;
+            preview.hidden = false;
+            reviewPreview.hidden = false;
+            video.hidden = true;
+            frameOverlay.hidden = true;
+            captureButton.disabled = true;
+            retakeButton.hidden = false;
+            usePhotoButton.disabled = false;
+            statusText.textContent = 'This preview shows the exact crop that will be sent to OCR.';
+
+            stopStream();
+        }
+
+        function resetCapture() {
+            preview.hidden = true;
+            reviewPreview.hidden = true;
+            preview.removeAttribute('src');
+            reviewPreview.removeAttribute('src');
+            video.hidden = false;
+            frameOverlay.hidden = false;
+            retakeButton.hidden = true;
+            usePhotoButton.disabled = true;
+            hiddenInput.value = '';
+            startCamera();
+        }
+
+        startButton.addEventListener('click', startCamera);
+        captureButton.addEventListener('click', capturePhoto);
+        retakeButton.addEventListener('click', resetCapture);
+
+        window.addEventListener('beforeunload', () => {
+            stopStream();
+        });
+    })();
+</script>
+{% endblock %}

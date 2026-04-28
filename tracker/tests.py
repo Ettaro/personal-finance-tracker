@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import Category, Transaction
+from .services.category_classifier import DEFAULT_CATEGORIES, suggest_category
 
 
 class TrackerViewsTests(TestCase):
@@ -94,6 +95,54 @@ class TrackerViewsTests(TestCase):
 
         self.assertContains(response, 'A category with this name already exists.')
         self.assertEqual(Category.objects.count(), 1)
+
+    def test_edit_category_updates_name(self):
+        response = self.client.post(
+            reverse('edit_category', args=[self.category.id]),
+            {'name': 'Home'},
+        )
+
+        self.assertRedirects(response, reverse('list_categories'))
+        self.category.refresh_from_db()
+        self.assertEqual(self.category.name, 'Home')
+
+    def test_edit_category_rejects_duplicate_name(self):
+        Category.objects.create(user=self.user, name='Food')
+
+        response = self.client.post(
+            reverse('edit_category', args=[self.category.id]),
+            {'name': 'food'},
+            follow=True,
+        )
+
+        self.assertContains(response, 'A category with this name already exists.')
+        self.category.refresh_from_db()
+        self.assertEqual(self.category.name, 'Housing')
+
+    def test_delete_category_without_transactions(self):
+        category = Category.objects.create(user=self.user, name='Temporary')
+
+        response = self.client.post(reverse('delete_category', args=[category.id]))
+
+        self.assertRedirects(response, reverse('list_categories'))
+        self.assertFalse(Category.objects.filter(id=category.id).exists())
+
+    def test_delete_category_with_transactions_is_blocked(self):
+        Transaction.objects.create(
+            user=self.user,
+            type='despesa',
+            amount='20.00',
+            category=self.category,
+            description='Bill',
+        )
+
+        response = self.client.post(
+            reverse('delete_category', args=[self.category.id]),
+            follow=True,
+        )
+
+        self.assertContains(response, 'This category has transactions and cannot be deleted.')
+        self.assertTrue(Category.objects.filter(id=self.category.id).exists())
 
     def test_delete_transaction_requires_post(self):
         transaction = Transaction.objects.create(
@@ -248,3 +297,30 @@ class TrackerViewsTests(TestCase):
 
         self.assertContains(response, 'Salary')
         self.assertNotContains(response, 'Flight')
+
+    def test_signup_creates_default_categories(self):
+        self.client.logout()
+
+        response = self.client.post(
+            reverse('signup'),
+            {
+                'username': 'new-user',
+                'password1': 'safe-password-456',
+                'password2': 'safe-password-456',
+            },
+        )
+
+        self.assertRedirects(response, reverse('dashboard'))
+        new_user = get_user_model().objects.get(username='new-user')
+        category_names = set(Category.objects.filter(user=new_user).values_list('name', flat=True))
+        self.assertTrue(set(DEFAULT_CATEGORIES).issubset(category_names))
+
+    def test_category_classifier_suggests_food_from_receipt_text(self):
+        categories = [
+            Category(user=self.user, name=category_name)
+            for category_name in DEFAULT_CATEGORIES
+        ]
+
+        category = suggest_category(categories, 'MIYAGI & MORIYAMA', 'R$900,00 restaurant')
+
+        self.assertEqual(category.name, 'Food')

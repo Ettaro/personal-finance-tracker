@@ -10,8 +10,11 @@ urlpatterns = [
     path('transactions/', views.list_transactions, name='list_transactions'),
     path('transactions/delete/<int:id>/', views.delete_transaction, name='delete_transaction'),
     path('categories/', views.list_categories, name='list_categories'),
+    path('categories/edit/<int:id>/', views.edit_category, name='edit_category'),
+    path('categories/delete/<int:id>/', views.delete_category, name='delete_category'),
     path('transactions/edit/<int:id>/', views.edit_transaction, name='edit_transaction'),
     path('analysis/preview/', views.financial_analysis_preview, name='financial_analysis_preview'),
     path('import-receipt/', views.import_receipt, name='import_receipt'),
+    path('import-receipt/scan/', views.receipt_scan, name='receipt_scan'),
     path('import-receipt/save/', views.save_imported_receipt, name='save_imported_receipt'),
 ]

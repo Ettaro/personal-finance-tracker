@@ -17,23 +17,61 @@
             <tr>
                 <th>ID</th>
                 <th>Name</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for category in categories %}
                 <tr>
                     <td data-label="ID">{{ category.id }}</td>
-                    <td data-label="Name">{{ category.name }}</td>
+                    <td data-label="Name">
+                        <form method="POST" action="{% url 'edit_category' category.id %}" class="category-inline-form">
+                            {% csrf_token %}
+                            <input type="text" name="name" value="{{ category.name }}" maxlength="100" required>
+                            <button type="submit">Save</button>
+                        </form>
+                    </td>
+                    <td data-label="Actions">
+                        <form method="POST" action="{% url 'delete_category' category.id %}" class="category-delete-form">
+                            {% csrf_token %}
+                            <button type="submit" class="danger-button">Delete</button>
+                        </form>
+                    </td>
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="2" style="text-align: center;">No categories found.</td>
+                    <td colspan="3" style="text-align: center;">No categories found.</td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
 
 <style>
+    .category-inline-form,
+    .category-delete-form {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .category-inline-form input {
+        min-width: 180px;
+    }
+
+    .category-inline-form button,
+    .category-delete-form button {
+        width: auto;
+        white-space: nowrap;
+    }
+
+    .danger-button {
+        background: linear-gradient(135deg, #c94336, #8f2f28);
+    }
+
     @media (max-width: 720px) {
         table,
         thead,
@@ -63,6 +101,18 @@
         td {
             padding: 8px 0;
             border: 0;
+        }
+
+        .category-inline-form,
+        .category-delete-form {
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        .category-inline-form input,
+        .category-inline-form button,
+        .category-delete-form button {
+            width: 100%;
         }
 
         td::before {
