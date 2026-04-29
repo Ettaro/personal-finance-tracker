@@ -326,10 +326,25 @@ def _build_receipt_import_context(user, uploaded_file):
             'cropped_image_ocr': '',
         }
     else:
-        ocr_variants = extract_receipt_ocr_variants(processed_image)
-        extracted_text = ocr_variants['best_text']
-        parsed_data = parse_receipt_ocr_payload(ocr_variants)
-        parsed_data = map_receipt_fields_with_ai(ocr_variants, parsed_data, categories)
+        try:
+            ocr_variants = extract_receipt_ocr_variants(processed_image)
+            extracted_text = ocr_variants['best_text']
+            parsed_data = parse_receipt_ocr_payload(ocr_variants)
+            parsed_data = map_receipt_fields_with_ai(ocr_variants, parsed_data, categories)
+        except Exception:
+            ocr_variants = {
+                'best_text': '',
+                'best_source': 'unavailable',
+                'full_image_ocr': '',
+                'cropped_image_ocr': '',
+            }
+            parsed_data = {
+                'description': '',
+                'amount': '',
+                'date': '',
+                'type': 'despesa',
+                'suggested_category': '',
+            }
 
     parsed_data['amount'] = parsed_data.get('amount', '')
     parsed_data['date'] = _normalize_imported_date(parsed_data.get('date', ''))
