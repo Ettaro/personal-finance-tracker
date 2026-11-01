@@ -1,5 +1,5 @@
 # Financial Tracker (Computer Science Project)
-
+   **Live demo:** (https://personal-finance-tracker-git-master-ettaros-projects.vercel.app/)
 Este é um projeto fullstack extremamente simples desenvolvido com **Django**, **HTML/CSS puro** e **SQLite**. O objetivo é demonstrar um sistema básico de controle financeiro de ponta a ponta.
 
 ## Funcionalidades
